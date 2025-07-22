@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/dardar4/FinonexETL/issues"
   },
-  "homepage": "https://github.com/dardar4/FinonexETL#readme"
+  "homepage": "https://github.com/dardar4/FinonexETL#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
 }
