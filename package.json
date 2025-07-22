@@ -1,0 +1,21 @@
+{
+  "name": "finonexetl",
+  "version": "1.0.0",
+  "description": "Finonex ETL home assignment",
+  "main": "client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dardar4/FinonexETL.git"
+  },
+  "keywords": [],
+  "author": "Amir Dar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dardar4/FinonexETL/issues"
+  },
+  "homepage": "https://github.com/dardar4/FinonexETL#readme"
+}
