@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('fs').promises;
+const { Pool } = require('pg');
 
 const EVENTS_FILE = 'events-to-process.jsonl';
 const SECRET_KEY = 'secret';
@@ -10,6 +11,44 @@ const port = 8000;
 
 // Middleware to parse JSON bodies
 app.use(express.json());
+
+// Database configuration - Change this to your own database configuration
+const dbConfig = {
+    user: 'postgres',
+    host: 'localhost',
+    database: 'postgres',
+    password: '1234',
+    port: 5432,
+};
+
+// users_revenue Repository class
+class UserRevenueRepository {
+    constructor() {
+        this.pool = new Pool(dbConfig); 
+    }
+
+    // Get all revenue records for a user
+    async getUserRevenue(userId) {
+
+        // Validate userId is not empty and is a string
+        if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+            throw new Error('userId must be a non-empty string');
+        }
+
+        const query = 'SELECT * FROM users_revenue WHERE user_id = $1';
+        const values = [userId];
+        const result = await this.pool.query(query, values);
+        return result.rows; // returns an array of rows
+    }
+
+    // Optionally, close the pool when your app shuts down
+    async close() {
+        await this.pool.end();
+    }
+}
+
+// Create a single shared instance
+const userRevenueRepo = new UserRevenueRepository();
 
 // EventStorage class to handle event file operations
 class EventFileWriter {
@@ -53,6 +92,7 @@ function validateEvent(event) {
     return { valid: true };
 }
 
+
 // Authentication middleware
 function authenticate(req, res, next) {
     const auth = req.headers['authorization'];
@@ -64,7 +104,8 @@ function authenticate(req, res, next) {
     next();
 }
 
-// POST /liveEvent: receive event and append to file
+
+
 app.post('/liveEvent', authenticate, async (req, res) => {
     const event = req.body;
     console.log(event);
@@ -84,19 +125,34 @@ app.post('/liveEvent', authenticate, async (req, res) => {
     }
 });
 
-// GET /userEvents/:userid: return all events for a user
-app.get('/userEvents/:userid', authenticate , (req, res) => {
+app.get('/userEvents/:userid', authenticate, async (req, res) => {
     const userId = req.params.userid;
-
-    // TODO: Read user events from DB
-    let events = [];
-
-    return res.status(200).json({ events });
+    try {
+        const events = await userRevenueRepo.getUserRevenue(userId);
+        if (events.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        return res.status(200).json(events[0]);
+    } catch (err) {
+        return res.status(500).json({ error: 'Failed to fetch user events', details: err.message });
+    }
 });
 
+
+
+// #region server-setup
+const shutdown = async () => {
+    console.log('Shutting down gracefully...');
+    await userRevenueRepo.close();
+    process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 
 // Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+// #endregion
