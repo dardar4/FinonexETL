@@ -3,8 +3,67 @@ import fs from 'fs';
 import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Pool } from 'pg';
 
 const DEFAULT_FILE_PATH = './events-to-process.jsonl';
+
+
+// Database configuration - Change this to your own database configuration
+const dbConfig = {
+    user: 'postgres',
+    host: 'localhost',
+    database: 'postgres',
+    password: '1234',
+    port: 5432,
+};
+
+// users_revenue Repository class
+class UserRevenueRepository {
+    constructor() {
+        this.pool = new Pool(dbConfig); 
+    }
+
+    // insert or update user revenue
+    async upsertUserRevenue(userRevenueDict, batchSize = 500) {
+
+        // Convert userRevenueDict to an array of [userId, revenue]
+        const entries = Object.entries(userRevenueDict);
+        if (entries.length === 0) 
+            return;
+
+        // Process users in batches to avoid memory issues
+        for (let i = 0; i < entries.length; i += batchSize) {
+            const userRevenueBatch = entries.slice(i, i + batchSize);
+            console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(entries.length / batchSize)}`);
+            console.log(`Batch size: ${userRevenueBatch.length}`);
+            await this.upsertUserRevenueBatch(userRevenueBatch);
+        }
+    }
+
+    async upsertUserRevenueBatch(userRevenueBatch) {
+        const values = [];
+        const params = [];
+        userRevenueBatch.forEach(([userId, revenue], i) => {
+            values.push(`($${i * 2 + 1}, $${i * 2 + 2})`);
+            params.push(userId, revenue);
+        });
+
+        const query = `
+            INSERT INTO users_revenue (user_id, revenue)
+            VALUES ${values.join(', ')}
+            ON CONFLICT (user_id)
+            DO UPDATE SET revenue = users_revenue.revenue + EXCLUDED.revenue
+        `;
+
+        await this.pool.query(query, params);
+    }
+
+    // Optionally, close the pool when your app shuts down
+    async close() {
+        await this.pool.end();
+    }
+}
+
 
 async function processEventsFile(filePath) {
     console.log(`Processing file: ${filePath}`);
@@ -53,7 +112,9 @@ async function processEventsFile(filePath) {
 }
 
 async function saveUserRevenueToDB(userRevenueDict) {
-    // TODO: Implement this function
+    let repository = new UserRevenueRepository();
+    await repository.upsertUserRevenue(userRevenueDict);
+    await repository.close();
 }
 
 async function parseEventRevenue(event, userRevenueDict) {
