@@ -1,6 +1,8 @@
-const lockfile = require('proper-lockfile');
-const fs = require('fs');
-const readline = require('readline');
+import lockfile from 'proper-lockfile';
+import fs from 'fs';
+import readline from 'readline';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const DEFAULT_FILE_PATH = './events-to-process.jsonl';
 
@@ -70,4 +72,12 @@ async function parseEventRevenue(event, userRevenueDict) {
     }
 }
 
-processEventsFile(process.argv[2] || DEFAULT_FILE_PATH);
+const __filename = fileURLToPath(import.meta.url);
+const __main = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (__main) {
+    processEventsFile(process.argv[2] || DEFAULT_FILE_PATH)
+    .catch(err => {
+      console.error("Error in main:", err);
+      process.exit(1);
+    });
+}

@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "finonexetl",
   "version": "1.0.0",
   "description": "Finonex ETL home assignment",
