@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs/promises';
 import { Pool } from 'pg';
+import lockfile from 'proper-lockfile';
 
 const EVENTS_FILE = 'events-to-process.jsonl';
 const SECRET_KEY = 'secret';
@@ -54,11 +55,38 @@ const userRevenueRepo = new UserRevenueRepository();
 class EventFileWriter {
     constructor(filename) {
         this.filename = filename;
+        this.ensureFileExists();
+    }
+
+    async ensureFileExists() {
+        try {
+            await fs.access(this.filename);
+        } catch (err) {
+            // File does not exist, create it empty
+            await fs.writeFile(this.filename, '');
+        }
     }
 
     async appendEvent(event) {
-         // Save event to a local file (jsonl format) 
-        await fs.appendFile(this.filename, JSON.stringify(event) + '\n');
+        let releaseLock;
+        try {
+            releaseLock = await lockfile.lock(this.filename, {
+                retries: {
+                    retries: 3,
+                    factor: 1,
+                    minTimeout: 1000,
+                    maxTimeout: 1000
+                },
+            });
+
+            await fs.appendFile(this.filename, JSON.stringify(event) + '\n');
+        } catch (err) {
+            throw err;
+        } finally {
+            if (releaseLock) {
+                await releaseLock();
+            }
+        }
     }
 }
 
@@ -108,7 +136,6 @@ function authenticate(req, res, next) {
 
 app.post('/liveEvent', authenticate, async (req, res) => {
     const event = req.body;
-    console.log(event);
 
     // Validate event data
     const validation = validateEvent(event);
@@ -120,7 +147,11 @@ app.post('/liveEvent', authenticate, async (req, res) => {
         const eventStorage = new EventFileWriter(EVENTS_FILE);
         await eventStorage.appendEvent(event);
         return res.status(200).json({ message: 'Event processed and saved successfully!' });
-    } catch (err) {
+    } 
+    catch (err) {
+        if (err.code === 'ELOCKED' || /timed out/i.test(err.message)) {
+            return res.status(423).json({ error: 'File is currently locked, please try again later.' });
+        }
         return res.status(500).json({ error: 'Failed to save event', details: err.message });
     }
 });

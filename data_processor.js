@@ -11,7 +11,16 @@ async function processEventsFile(filePath) {
 
     let releaseLock;
     try {
-        releaseLock = await lockfile.lock(filePath);
+
+        releaseLock = await lockfile.lock(filePath, {
+            retries: {
+                retries: 3,
+                factor: 1,
+                minTimeout: 1000,
+                maxTimeout: 1000
+            },
+        });
+
 
         const readlineInterface = readline.createInterface({
             input: fs.createReadStream(filePath),

@@ -141,4 +141,4 @@ vite.config.ts.timestamp-*
 events.jsonl
 events-to-process.jsonl
 .vscode/launch.json
-results.txt
+test_integration.js
