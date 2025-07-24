@@ -121,7 +121,6 @@ async function processEventsFile(filePath) {
         }   
 
         // Save events to DB - only clear file if this succeeds
-        //todo: only clear file if this succeeds
         await saveUserRevenueToDB(userRevenueDict);
 
         // After successful processing, clear the file
