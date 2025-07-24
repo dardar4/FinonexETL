@@ -1,4 +1,5 @@
-import fs from 'fs';
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import readline from 'readline';
 import axios from 'axios';
 import path from 'path';
@@ -13,29 +14,29 @@ class EventSender {
 
   addAuthHeader() {
     return {
-        'Authorization': this.authToken,
-        'Accept': 'application/json'
-    }
+      'Authorization': this.authToken,
+      'Accept': 'application/json'
+    };
   }
-
-  getPingUrl = () => { return this.baseUrl + 'ping'; }
-  getLiveEventUrl = () => { return this.baseUrl + 'liveEvent'; }
-    
   
+  getPingUrl = () => { return this.baseUrl + 'ping'; }
+  
+  getLiveEventUrl = () => { return this.baseUrl + 'liveEvent'; }
+
   async testConnection() {
     try {
       const response = await axios.get(this.getPingUrl(), { headers: this.addAuthHeader() });
 
-      if (response.status === 200) 
+      if (response.status === 200) {
         return true;
+      }
+      console.error(`Ping failed with status ${response.status}`);
+      return false;
     } 
     catch (err) {
       console.error('Connection error:', err.message || err);
       return false;
     }
-
-    console.error(`Ping failed with status ${response.status}`);
-    return false;
   }
   
   async sendEvent(event) {
@@ -84,7 +85,17 @@ class EventProcessor {
   }
 
   async processEventsFile() {
-    const fileStream = fs.createReadStream(this.eventsFile);
+    console.log(`Processing file: ${this.eventsFile}`);
+
+    // Check if file exists before proceeding
+    try {
+      await fs.access(this.eventsFile);
+    } catch (err) {
+      console.error(`File does not exist: ${this.eventsFile}`);
+      return;
+    }
+
+    const fileStream = createReadStream(this.eventsFile);
 
     fileStream.on('error', (err) => {
       console.error('Failed to open file:', err.message);
@@ -116,14 +127,16 @@ class EventProcessor {
   }
 }
 
+// Main execution check for Node.js
 const __filename = fileURLToPath(import.meta.url);
-const __main = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
-if (__main) {
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+
+if (isMainModule) {
   (async () => {
     const sender = new EventSender('http://localhost:8000/', 'secret');
 
     if (!await sender.testConnection()) {
-      console.error("Failed to connect to server");
+      console.error('Failed to connect to server');
       process.exit(1);
     }
   
@@ -131,7 +144,7 @@ if (__main) {
     try {
       await processor.processEventsFile();
     } catch (err) {
-      console.error("Error in main:", err);
+      console.error('Error in main:', err);
       process.exit(1);
     }
   })();

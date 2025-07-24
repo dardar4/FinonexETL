@@ -1,5 +1,6 @@
 import lockfile from 'proper-lockfile';
-import fs from 'fs';
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import readline from 'readline';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -55,7 +56,12 @@ class UserRevenueRepository {
             DO UPDATE SET revenue = users_revenue.revenue + EXCLUDED.revenue
         `;
 
-        await this.pool.query(query, params);
+        try {
+            await this.pool.query(query, params);
+        } catch (err) {
+            console.error('Database error during batch upsert:', err);
+            throw new Error(`Failed to update user revenue batch: ${err.message}`);
+        }
     }
 
     // Optionally, close the pool when your app shuts down
@@ -67,6 +73,14 @@ class UserRevenueRepository {
 
 async function processEventsFile(filePath) {
     console.log(`Processing file: ${filePath}`);
+
+    // Check if file exists before proceeding
+    try {
+        await fs.access(filePath);
+    } catch (err) {
+        console.error(`File does not exist: ${filePath}`);
+        return;
+    }
 
     let releaseLock;
     try {
@@ -80,9 +94,15 @@ async function processEventsFile(filePath) {
             },
         });
 
+        const fileStream = createReadStream(filePath);
+
+        fileStream.on('error', (err) => {
+          console.error('Failed to open file:', err.message);
+          process.exit(1);
+        });
 
         const readlineInterface = readline.createInterface({
-            input: fs.createReadStream(filePath),
+            input: fileStream,
             crlfDelay: Infinity
         });
 
@@ -91,15 +111,21 @@ async function processEventsFile(filePath) {
             if (!line.trim()) 
                 continue;
 
-            const event = JSON.parse(line);
-            await parseEventRevenue(event, userRevenueDict);
+            try {
+                const event = JSON.parse(line);
+                await parseEventRevenue(event, userRevenueDict);
+            } catch (err) {
+                console.error('Invalid JSON line:', line, err.message);
+                continue;
+            }
         }   
 
-        // 2. Save events to DB
+        // Save events to DB - only clear file if this succeeds
+        //todo: only clear file if this succeeds
         await saveUserRevenueToDB(userRevenueDict);
 
-        // After processing all lines, clear the file
-        fs.writeFileSync(filePath, '');
+        // After successful processing, clear the file
+        await fs.writeFile(filePath, '');
         console.log('File cleared after processing.');
     } 
     catch (err) {
@@ -113,8 +139,15 @@ async function processEventsFile(filePath) {
 
 async function saveUserRevenueToDB(userRevenueDict) {
     let repository = new UserRevenueRepository();
-    await repository.upsertUserRevenue(userRevenueDict);
-    await repository.close();
+    try {
+        await repository.upsertUserRevenue(userRevenueDict);
+        console.log('Successfully saved user revenue data to database');
+    } catch (err) {
+        console.error('Failed to save user revenue to database:', err);
+        throw err;
+    } finally {
+        await repository.close();
+    }
 }
 
 async function parseEventRevenue(event, userRevenueDict) {
@@ -142,12 +175,14 @@ async function parseEventRevenue(event, userRevenueDict) {
     }
 }
 
+// Main execution check for Node.js
 const __filename = fileURLToPath(import.meta.url);
-const __main = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
-if (__main) {
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+
+if (isMainModule) {
     processEventsFile(process.argv[2] || DEFAULT_FILE_PATH)
     .catch(err => {
-      console.error("Error in main:", err);
+      console.error('Error in main:', err);
       process.exit(1);
     });
 }

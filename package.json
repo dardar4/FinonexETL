@@ -3,7 +3,7 @@
   "name": "finonexetl",
   "version": "1.0.0",
   "description": "Finonex ETL home assignment",
-  "main": "client.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "node server.js",

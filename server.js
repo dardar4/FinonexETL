@@ -149,6 +149,7 @@ app.post('/liveEvent', authenticate, async (req, res) => {
         return res.status(200).json({ message: 'Event processed and saved successfully!' });
     } 
     catch (err) {
+        console.error('Error saving event:', err);
         if (err.code === 'ELOCKED' || /timed out/i.test(err.message)) {
             return res.status(423).json({ error: 'File is currently locked, please try again later.' });
         }
@@ -158,6 +159,12 @@ app.post('/liveEvent', authenticate, async (req, res) => {
 
 app.get('/userEvents/:userid', authenticate, async (req, res) => {
     const userId = req.params.userid;
+    
+    // Validate user ID parameter
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        return res.status(400).json({ error: 'Invalid user ID parameter' });
+    }
+    
     try {
         const events = await userRevenueRepo.getUserRevenue(userId);
         if (events.length === 0) {
@@ -165,6 +172,7 @@ app.get('/userEvents/:userid', authenticate, async (req, res) => {
         }
         return res.status(200).json(events[0]);
     } catch (err) {
+        console.error('Database error in /userEvents:', err);
         return res.status(500).json({ error: 'Failed to fetch user events', details: err.message });
     }
 });
@@ -175,19 +183,22 @@ app.get('/ping', (req, res) => {
 });
 
 
-// #region server-setup
+// Graceful shutdown handler
 const shutdown = async () => {
     console.log('Shutting down gracefully...');
-    await userRevenueRepo.close();
+    try {
+        await userRevenueRepo.close();
+        console.log('Database connections closed.');
+    } catch (err) {
+        console.error('Error during shutdown:', err);
+    }
     process.exit(0);
 };
+
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-
 
 // Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-
-// #endregion
