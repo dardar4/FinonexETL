@@ -41,8 +41,6 @@ class EventSender {
   
   async sendEvent(event) {
     try {
-      console.log('Sent event:', event);
-
       const headers = this.addAuthHeader();
       const response = await axios.post(this.getLiveEventUrl(), event, { headers });
       if (response.status !== 200) {

@@ -36,7 +36,6 @@ class UserRevenueRepository {
         for (let i = 0; i < entries.length; i += batchSize) {
             const userRevenueBatch = entries.slice(i, i + batchSize);
             console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(entries.length / batchSize)}`);
-            console.log(`Batch size: ${userRevenueBatch.length}`);
             await this.upsertUserRevenueBatch(userRevenueBatch);
         }
     }
