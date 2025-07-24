@@ -106,6 +106,21 @@ psql -U postgres -d postgres
 3. Open the `db.sql` file in the SQL editor
 4. Execute the script (usually Ctrl+Enter or F5)
 
+### Database Schema Details
+
+The `users_revenue` table structure:
+```sql
+CREATE TABLE IF NOT EXISTS users_revenue (
+    user_id VARCHAR(255) NOT NULL PRIMARY KEY,
+    revenue INT NOT NULL
+);
+```
+
+**Key Points:**
+- `user_id` is the **Primary Key** - automatically indexed for fast lookups
+- Revenue queries by `userId` (like `GET /users/:userId/revenue`) are optimized due to PK indexing
+- `revenue` stores integer values (int4 range: -2,147,483,648 to +2,147,483,647)
+
 
 ## Configuration
 
@@ -184,9 +199,9 @@ Events must be in JSONL (JSON Lines) format - one JSON object per line:
 ```
 
 **Required Event Fields:**
-- `userId` (string): User identifier
+- `userId` (string): User identifier (maximum 255 characters - database constraint)
 - `name` (string): Event type - must be either `"add_revenue"` or `"subtract_revenue"`
-- `value` (number): Revenue amount to add or subtract
+- `value` (integer): Revenue amount to add or subtract (int4 range: -2,147,483,648 to +2,147,483,647)
 
 **File Location:**
 - Events files should be in the **same directory** as the project root
@@ -365,11 +380,18 @@ Invoke-RestMethod http://localhost:8000/users/user123/revenue
 {"userId": "user2", "name": "subtract_revenue", "value": 50}
 ```
 
+**Field Constraints:**
+- `userId`: Maximum 255 characters (VARCHAR(255) in database)
+- `name`: Must be exactly `"add_revenue"` or `"subtract_revenue"`
+- `value`: Integer only, range -2,147,483,648 to +2,147,483,647 (int4)
+
 **Invalid Examples:**
 ```json
 {"userId": "user1", "name": "invalid_event", "value": 100}  // Invalid event name
 {"user": "user1", "name": "add_revenue", "value": 100}      // Wrong field name
 {"userId": "user1", "name": "add_revenue"}                  // Missing value
+{"userId": "user1", "name": "add_revenue", "value": 50.5}   // Float not allowed (must be integer)
+{"userId": "very_long_user_id_that_exceeds_255_characters...", "name": "add_revenue", "value": 100}  // userId too long
 ```
 
 ## Troubleshooting
