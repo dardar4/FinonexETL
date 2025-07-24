@@ -1,6 +1,6 @@
-const express = require('express');
-const fs = require('fs').promises;
-const { Pool } = require('pg');
+import express from 'express';
+import fs from 'fs/promises';
+import { Pool } from 'pg';
 
 const EVENTS_FILE = 'events-to-process.jsonl';
 const SECRET_KEY = 'secret';
@@ -138,6 +138,10 @@ app.get('/userEvents/:userid', authenticate, async (req, res) => {
     }
 });
 
+// Health check endpoint
+app.get('/ping', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'pong' });
+});
 
 
 // #region server-setup
