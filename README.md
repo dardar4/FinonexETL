@@ -319,8 +319,6 @@ Invoke-RestMethod http://localhost:8000/users/user123/revenue
    # or try: sc query postgresql
    
    # Check the STATE column in the output - should show RUNNING
-   # If STATE is STOPPED, proceed with start command below
-   ```
    # Start if not running:
    net start postgresql-x64-17
    ```
